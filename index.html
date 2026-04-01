@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Sistema</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #313338;
+  color: #fff;
+}
+
+.card {
+  background: #2b2d31;
+  padding: 20px;
+  border-radius: 10px;
+  width: 300px;
+  margin: auto;
+  margin-top: 100px;
+}
+
+input {
+  width: 90%;
+  padding: 10px;
+  margin: 5px;
+  border-radius: 5px;
+  border: none;
+  background: #1e1f22;
+  color: white;
+}
+
+button {
+  width: 95%;
+  padding: 10px;
+  margin-top: 10px;
+  border: none;
+  background: #5865f2;
+  color: white;
+  border-radius: 5px;
+}
+
+a {
+  color: #00a8fc;
+  cursor: pointer;
+}
+
+#config {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: none;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div id="config" onclick="abrirConfig()">⚙️</div>
+<div id="tela"></div>
+
+<script>
+let usuarioAtual = "";
+let isAdmin = false;
+
+mostrarLogin();
+
+function mostrarLogin() {
+  tela.innerHTML = `
+    <div class="card">
+      <h2>Login</h2>
+      <input id="user" placeholder="Usuário"><br>
+      <input id="pass" type="password" placeholder="Senha"><br>
+      <button onclick="login()">Entrar</button>
+      <p>Não tem login? <a onclick="mostrarCadastro()">Cadastre-se</a></p>
+    </div>
+  `;
+}
+
+function mostrarCadastro() {
+  tela.innerHTML = `
+    <div class="card">
+      <h2>Cadastro</h2>
+      <input id="novoUser" placeholder="Usuário"><br>
+      <input id="novaSenha" type="password" placeholder="Senha"><br>
+      <input type="file" id="foto"><br>
+      <button onclick="cadastrar()">Cadastrar</button>
+      <p><a onclick="mostrarLogin()">Voltar</a></p>
+    </div>
+  `;
+}
+
+async function cadastrar() {
+  let form = new FormData();
+  form.append("user", novoUser.value);
+  form.append("pass", novaSenha.value);
+  form.append("foto", foto.files[0]);
+
+  let res = await fetch("/cadastrar", {
+    method: "POST",
+    body: form
+  });
+
+  let data = await res.json();
+
+  if (data.erro) alert(data.erro);
+  else {
+    alert("Cadastrado!");
+    mostrarLogin();
+  }
+}
+
+async function login() {
+  let res = await fetch("/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      user: user.value,
+      pass: pass.value
+    })
+  });
+
+  let data = await res.json();
+
+  if (data.sucesso) {
+    usuarioAtual = user.value;
+    perguntarAdmin();
+  } else {
+    alert("Login inválido");
+  }
+}
+
+function perguntarAdmin() {
+  tela.innerHTML = `
+    <div class="card">
+      <h3>Você é admin?</h3>
+      <button onclick="admin(true)">Sim</button>
+      <button onclick="admin(false)">Não</button>
+    </div>
+  `;
+}
+
+function admin(resp) {
+  if (resp) {
+    tela.innerHTML = `
+      <div class="card">
+        <input id="codigo" placeholder="Código">
+        <button onclick="verificar()">Entrar</button>
+      </div>
+    `;
+  } else {
+    entrarSistema();
+  }
+}
+
+function verificar() {
+  if (codigo.value === "L") {
+    isAdmin = true;
+    entrarSistema();
+  } else {
+    alert("Código errado");
+  }
+}
+
+function entrarSistema() {
+  config.style.display = "block";
+
+  tela.innerHTML = `
+    <div class="card">
+      <h2>Bem-vindo ${usuarioAtual}</h2>
+      <button onclick="logout()">Sair</button>
+    </div>
+  `;
+}
+
+function abrirConfig() {
+  if (!isAdmin) return alert("Apenas admin!");
+
+  tela.innerHTML = `
+    <div class="card">
+      <h2>Painel Admin</h2>
+      <button onclick="verLogados()">Logados</button>
+      <button onclick="mostrarUsuarios()">Usuários</button>
+      <button onclick="logout()">Sair</button>
+    </div>
+  `;
+}
+
+async function verLogados() {
+  let res = await fetch("/logados");
+  let lista = await res.json();
+
+  tela.innerHTML = `
+    <div class="card">
+      ${lista.map(u => `
+        <div style="display:flex;gap:10px;margin:10px;">
+          ${u.foto ? `<img src="${u.foto}" width="40" style="border-radius:50%">` : ""}
+          <span>${u.user}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function mostrarUsuarios() {
+  let res = await fetch("/usuarios");
+  let lista = await res.json();
+
+  tela.innerHTML = `
+    <div class="card">
+      ${lista.map(u => `
+        <div style="display:flex;gap:10px;margin:10px;">
+          ${u.foto ? `<img src="${u.foto}" width="40" style="border-radius:50%">` : ""}
+          <span>${u.user}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function logout() {
+  await fetch("/logout", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ user: usuarioAtual })
+  });
+
+  usuarioAtual = "";
+  isAdmin = false;
+  config.style.display = "none";
+
+  mostrarLogin();
+}
+</script>
+
+</body>
+</html>
